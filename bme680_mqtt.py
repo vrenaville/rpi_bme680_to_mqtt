@@ -31,7 +31,7 @@ def build_json(user,date,subtopic,value):
         "user": user,
         subtopic: value,
     })
-    logging.info("publishing data to temperature via mqtt to topic %s", TEMPERATURE_TOPIC)
+    logging.info("publishing data to temperature via mqtt to topic %s", subtopic)
     return env_data
 
 
@@ -73,11 +73,11 @@ try:
                 if sensor.get_sensor_data():
                     now = time.time()
                     timestamp = int(now)
-                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    env_data = build_json('rpi',timestamp,'humidity',sensor.data.humidity)
                     mqtt.publish(topic + '/humidity', payload=env_data, retain=True)
-                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    env_data = build_json('rpi',timestamp,'barometer',sensor.data.pressure)
                     mqtt.publish(topic + '/barometer', payload=env_data, retain=True)
-                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    env_data = build_json('rpi',timestamp,'temperature',sensor.data.temperature)
                     mqtt.publish(topic + '/temperature', payload=env_data, retain=True)
 
                     if now - start_time < burn_in_time:
