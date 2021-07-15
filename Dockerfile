@@ -1,4 +1,4 @@
-FROM arm32v7/python:slim
+FROM python:3.8
 
 RUN mkdir /app
 
@@ -15,4 +15,4 @@ RUN apt-get update -y && \
 
 COPY *.py /app/
 
-CMD ["/app/bme680_mqtt.py"]
+CMD [ "python", "/app/bme680_mqtt.py"]
