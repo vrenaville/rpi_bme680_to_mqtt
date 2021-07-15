@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-mqtt_host = 'mqtt.home'
-
+mqtt_host = 'tracking.v6.rocks'
 import paho.mqtt.client as paho
 import bme680
 import time
 import fcntl
-from i2c_lock import i2c_lock, i2c_unlock
-
-topic = '/sensor/desk'
+topic = 'envcontrol/rpi/rpi'
 
 def on_disconnect(mqtt, userdata, rc):
     print("Disconnected from MQTT server with code: %s" % rc)
@@ -22,7 +19,9 @@ def on_disconnect(mqtt, userdata, rc):
         print("Reconnected to MQTT server.")
 
 mqtt = paho.Client()
-mqtt.connect(mqtt_host, 1883, 60)
+mqtt.username_pw_set('rak','XXXXXXXXXXXXXXXXXXXXXx')
+mqtt.tls_set()
+mqtt.connect(mqtt_host, 8883, 60)
 mqtt.on_disconnect = on_disconnect
 mqtt.loop_start()
 
@@ -31,8 +30,7 @@ mqtt.loop_start()
 try:
     while True:
         try:
-            i2c_lock()
-            sensor = bme680.BME680()
+            sensor = bme680.BME680(0x77)
             sensor.set_humidity_oversample(bme680.OS_2X)
             sensor.set_pressure_oversample(bme680.OS_4X)
             sensor.set_temperature_oversample(bme680.OS_8X)
@@ -42,7 +40,6 @@ try:
             sensor.set_gas_heater_temperature(320)
             sensor.set_gas_heater_duration(150)
             sensor.select_gas_heater_profile(0)
-            i2c_unlock()
 
             start_time = time.time()
             burn_in_time = 300
@@ -57,15 +54,14 @@ try:
             hum_weighting = 0.25
 
             while True:
-                i2c_lock()
                 if sensor.get_sensor_data():
                     now = time.time()
                     timestamp = int(now)
                     mqtt.publish(topic + '/watchdog', 'reset', retain=False)
                     mqtt.publish(topic + '/humidity', sensor.data.humidity, retain=True)
                     mqtt.publish(topic + '/humidity/timestamp', timestamp, retain=True)
-                    mqtt.publish(topic + '/pressure', sensor.data.pressure, retain=True)
-                    mqtt.publish(topic + '/pressure/timestamp', timestamp, retain=True)
+                    mqtt.publish(topic + '/barometer', sensor.data.pressure, retain=True)
+                    mqtt.publish(topic + '/barometer/timestamp', timestamp, retain=True)
                     mqtt.publish(topic + '/temperature', sensor.data.temperature, retain=True)
                     mqtt.publish(topic + '/temperature/timestamp', timestamp, retain=True)
 
@@ -74,13 +70,11 @@ try:
                             gas = sensor.data.gas_resistance
                             burn_in_data.append(gas)
                         print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
-                        i2c_unlock()
                         time.sleep(1)
 
                     elif gas_baseline is None:
                         gas_baseline = sum(burn_in_data[-50:]) / 50.0
                         print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
-                        i2c_unlock()
                         time.sleep(1)
 
                     else:
@@ -103,18 +97,16 @@ try:
 
                             mqtt.publish(topic + '/gas', gas, retain=True)
                             mqtt.publish(topic + '/gas/timestamp', timestamp, retain=True)
-                            mqtt.publish(topic + '/aq', aq_score, retain=True)
-                            mqtt.publish(topic + '/aq/timestamp', timestamp, retain=True)
+                            mqtt.publish(topic + '/iaq', aq_score, retain=True)
+                            mqtt.publish(topic + '/iaq/timestamp', timestamp, retain=True)
 
                             print("{}ºC\t{} %rH\t{} hPa\t{} Ohms\t{}%".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure, gas, aq_score))
 
-                        i2c_unlock()
                         time.sleep(10)
                 else:
                     print("No data yet.")
         except IOError as e:
             print("IOError: "+str(e))
-            i2c_unlock()
             time.sleep(3)
 
 except KeyboardInterrupt:
