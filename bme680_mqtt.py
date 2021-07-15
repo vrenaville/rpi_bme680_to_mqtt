@@ -56,6 +56,7 @@ if __name__ == '__main__':
         while True:
             try:
                 logging.info("Init")
+                print ("init")
                 sensor = bme680.BME680(0x77)
                 sensor.set_humidity_oversample(bme680.OS_2X)
                 sensor.set_pressure_oversample(bme680.OS_4X)
@@ -80,6 +81,7 @@ if __name__ == '__main__':
                 hum_weighting = 0.25
 
                 while True:
+                    print("get data")
                     logging.info("Get data")
                     if sensor.get_sensor_data():
                         now = time.time()
@@ -130,6 +132,7 @@ if __name__ == '__main__':
                     else:
                         logging.info("No data yet.")
             except IOError as e:
+                print("IO ERROR")
                 logging.info("IOError: "+str(e))
                 time.sleep(3)
 
