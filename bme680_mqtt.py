@@ -6,7 +6,14 @@ import paho.mqtt.client as paho
 import bme680
 import time
 import fcntl
+import json
+import os
+import logging
 topic = 'envcontrol/rpi/rpi'
+DST_MQTT_HOST = os.getenv("DST_MQTT_HOST")
+DST_MQTT_USER = os.getenv("DST_MQTT_USER")
+DST_MQTT_PASS = os.getenv("DST_MQTT_PASS")
+VERSION = "v1.0"
 
 def on_disconnect(mqtt, userdata, rc):
     print("Disconnected from MQTT server with code: %s" % rc)
@@ -18,13 +25,22 @@ def on_disconnect(mqtt, userdata, rc):
             pass
         print("Reconnected to MQTT server.")
 
+def build_json(user,date,subtopic,value):
+    env_data = json.dumps({
+        "date": date,
+        "user": user,
+        subtopic: value,
+    })
+    logging.info("publishing data to temperature via mqtt to topic %s", TEMPERATURE_TOPIC)
+    return env_data
+
+
 mqtt = paho.Client()
-mqtt.username_pw_set('rak','XXXXXXXXXXXXXXXXXXXXXx')
+mqtt.username_pw_set(DST_MQTT_USER,DST_MQTT_PASS)
 mqtt.tls_set()
-mqtt.connect(mqtt_host, 8883, 60)
+mqtt.connect(DST_MQTT_HOST, 8883, 60)
 mqtt.on_disconnect = on_disconnect
 mqtt.loop_start()
-
 
 
 try:
@@ -57,24 +73,23 @@ try:
                 if sensor.get_sensor_data():
                     now = time.time()
                     timestamp = int(now)
-                    mqtt.publish(topic + '/watchdog', 'reset', retain=False)
-                    mqtt.publish(topic + '/humidity', sensor.data.humidity, retain=True)
-                    mqtt.publish(topic + '/humidity/timestamp', timestamp, retain=True)
-                    mqtt.publish(topic + '/barometer', sensor.data.pressure, retain=True)
-                    mqtt.publish(topic + '/barometer/timestamp', timestamp, retain=True)
-                    mqtt.publish(topic + '/temperature', sensor.data.temperature, retain=True)
-                    mqtt.publish(topic + '/temperature/timestamp', timestamp, retain=True)
+                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    mqtt.publish(topic + '/humidity', payload=env_data, retain=True)
+                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    mqtt.publish(topic + '/barometer', payload=env_data, retain=True)
+                    env_data = build_json('rpi',timestamp,'gas',gas)
+                    mqtt.publish(topic + '/temperature', payload=env_data, retain=True)
 
                     if now - start_time < burn_in_time:
                         if sensor.data.heat_stable:
                             gas = sensor.data.gas_resistance
                             burn_in_data.append(gas)
-                        print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
+                        logging.info("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
                         time.sleep(1)
 
                     elif gas_baseline is None:
                         gas_baseline = sum(burn_in_data[-50:]) / 50.0
-                        print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
+                        logging.info("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
                         time.sleep(1)
 
                     else:
@@ -94,19 +109,17 @@ try:
                                 gas_score = 100 - (hum_weighting * 100)
 
                             aq_score = hum_score + gas_score
-
-                            mqtt.publish(topic + '/gas', gas, retain=True)
-                            mqtt.publish(topic + '/gas/timestamp', timestamp, retain=True)
-                            mqtt.publish(topic + '/iaq', aq_score, retain=True)
-                            mqtt.publish(topic + '/iaq/timestamp', timestamp, retain=True)
-
-                            print("{}ºC\t{} %rH\t{} hPa\t{} Ohms\t{}%".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure, gas, aq_score))
+                            env_data = build_json('rpi',timestamp,'gas',gas)
+                            mqtt.publish(topic + '/gas', payload=env_data, retain=True)
+                            env_data = build_json('rpi',timestamp,'iaq',aq_score)
+                            mqtt.publish(topic + '/iaq', payload=env_data, retain=True)
+                            logging.info("{}ºC\t{} %rH\t{} hPa\t{} Ohms\t{}%".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure, gas, aq_score))
 
                         time.sleep(10)
                 else:
-                    print("No data yet.")
+                    logging.info("No data yet.")
         except IOError as e:
-            print("IOError: "+str(e))
+            logging.info("IOError: "+str(e))
             time.sleep(3)
 
 except KeyboardInterrupt:
