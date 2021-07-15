@@ -34,7 +34,7 @@ def build_json(user,date,subtopic,value):
     logging.info("publishing data to temperature via mqtt to topic %s", subtopic)
     return env_data
 
-
+logging.info("Start")
 mqtt = paho.Client()
 mqtt.username_pw_set(DST_MQTT_USER,DST_MQTT_PASS)
 mqtt.tls_set()
@@ -46,6 +46,7 @@ mqtt.loop_start()
 try:
     while True:
         try:
+            logging.info("Init")
             sensor = bme680.BME680(0x77)
             sensor.set_humidity_oversample(bme680.OS_2X)
             sensor.set_pressure_oversample(bme680.OS_4X)
@@ -70,6 +71,7 @@ try:
             hum_weighting = 0.25
 
             while True:
+                logging.info("Get data")
                 if sensor.get_sensor_data():
                     now = time.time()
                     timestamp = int(now)
