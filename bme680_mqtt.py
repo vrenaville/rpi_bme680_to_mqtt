@@ -31,13 +31,13 @@ def build_json(user,date,subtopic,value):
         "user": user,
         subtopic: value,
     })
-    logging.info("publishing data to temperature via mqtt to topic %s", subtopic)
+    print("publishing data to temperature via mqtt to topic %s", subtopic)
     return env_data
 
 
 if __name__ == '__main__':
 
-    logging.info("Start")
+    print("Start")
     mqtt = paho.Client()
     mqtt.username_pw_set(DST_MQTT_USER,DST_MQTT_PASS)
     mqtt.tls_set()
@@ -55,7 +55,6 @@ if __name__ == '__main__':
     try:
         while True:
             try:
-                logging.info("Init")
                 print ("init")
                 sensor = bme680.BME680(0x77)
                 sensor.set_humidity_oversample(bme680.OS_2X)
@@ -82,27 +81,26 @@ if __name__ == '__main__':
 
                 while True:
                     print("get data")
-                    logging.info("Get data")
                     if sensor.get_sensor_data():
                         now = time.time()
                         timestamp = int(now)
                         env_data = build_json('rpi',timestamp,'humidity',sensor.data.humidity)
-                        mqtt.publish(topic + '/humidity', payload=env_data, retain=True)
+                        mqtt.publish(topic + '/humidity', payload=env_data, retain=True, qos=1)
                         env_data = build_json('rpi',timestamp,'barometer',sensor.data.pressure)
-                        mqtt.publish(topic + '/barometer', payload=env_data, retain=True)
+                        mqtt.publish(topic + '/barometer', payload=env_data, retain=True, qos=1)
                         env_data = build_json('rpi',timestamp,'temperature',sensor.data.temperature)
-                        mqtt.publish(topic + '/temperature', payload=env_data, retain=True)
+                        mqtt.publish(topic + '/temperature', payload=env_data, retain=True, qos=1)
 
                         if now - start_time < burn_in_time:
                             if sensor.data.heat_stable:
                                 gas = sensor.data.gas_resistance
                                 burn_in_data.append(gas)
-                            logging.info("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
+                            print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
                             time.sleep(1)
 
                         elif gas_baseline is None:
                             gas_baseline = sum(burn_in_data[-50:]) / 50.0
-                            logging.info("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
+                            print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
                             time.sleep(1)
 
                         else:
@@ -123,17 +121,16 @@ if __name__ == '__main__':
 
                                 aq_score = hum_score + gas_score
                                 env_data = build_json('rpi',timestamp,'gas',gas)
-                                mqtt.publish(topic + '/gas', payload=env_data, retain=True)
+                                mqtt.publish(topic + '/gas', payload=env_data, retain=True, qos=1)
                                 env_data = build_json('rpi',timestamp,'iaq',aq_score)
-                                mqtt.publish(topic + '/iaq', payload=env_data, retain=True)
-                                logging.info("{}ºC\t{} %rH\t{} hPa\t{} Ohms\t{}%".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure, gas, aq_score))
+                                mqtt.publish(topic + '/iaq', payload=env_data, retain=True, qos=1)
+                                print("{}ºC\t{} %rH\t{} hPa\t{} Ohms\t{}%".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure, gas, aq_score))
 
                             time.sleep(10)
                     else:
-                        logging.info("No data yet.")
+                        print("No data yet.")
             except IOError as e:
                 print("IO ERROR")
-                logging.info("IOError: "+str(e))
                 time.sleep(3)
 
     except KeyboardInterrupt:

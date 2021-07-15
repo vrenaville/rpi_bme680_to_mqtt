@@ -15,4 +15,4 @@ RUN apt-get update -y && \
 
 COPY *.py /app/
 
-CMD [ "python", "/app/bme680_mqtt.py"]
+CMD [ "python","-u", "/app/bme680_mqtt.py"]
