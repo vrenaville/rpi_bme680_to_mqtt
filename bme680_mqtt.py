@@ -8,6 +8,7 @@ import time
 import fcntl
 import json
 import os
+from datetime import datetime
 import logging
 topic = 'envcontrol/rpi/rpi'
 DST_MQTT_HOST = os.getenv("DST_MQTT_HOST")
@@ -31,7 +32,6 @@ def build_json(user,date,subtopic,value):
         "user": user,
         subtopic: value,
     })
-    print("publishing data to temperature via mqtt to topic %s", subtopic)
     return env_data
 
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     print("get data")
                     if sensor.get_sensor_data():
                         now = time.time()
-                        timestamp = int(now)
+                        timestamp = int(datetime.timestamp(datetime.now()))
                         env_data = build_json('rpi',timestamp,'humidity',sensor.data.humidity)
                         mqtt.publish(topic + '/humidity', payload=env_data, retain=True, qos=1)
                         env_data = build_json('rpi',timestamp,'barometer',sensor.data.pressure)
@@ -96,12 +96,12 @@ if __name__ == '__main__':
                                 gas = sensor.data.gas_resistance
                                 burn_in_data.append(gas)
                             print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
-                            time.sleep(1)
+                            time.sleep(10)
 
                         elif gas_baseline is None:
                             gas_baseline = sum(burn_in_data[-50:]) / 50.0
                             print("{}ºC\t{} %rH\t{} hPa".format(sensor.data.temperature, sensor.data.humidity, sensor.data.pressure))
-                            time.sleep(1)
+                            time.sleep(10)
 
                         else:
                             if sensor.data.heat_stable:
